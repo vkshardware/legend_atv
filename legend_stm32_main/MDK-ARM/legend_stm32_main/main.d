@@ -34,6 +34,6 @@ legend_stm32_main/main.o: ..\Core\Src\main.c ..\Core\Inc\main.h \
   ..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_tim.h \
   ..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_tim_ex.h \
   ..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_uart.h \
-  D:\Keil\ARM\ARMCLANG\Bin\..\include\math.h ..\Core\Inc\FlashPROM.h \
-  D:\Keil\ARM\ARMCLANG\Bin\..\include\string.h \
-  D:\Keil\ARM\ARMCLANG\Bin\..\include\stdio.h
+  ..\Core\Inc\FlashPROM.h D:\Keil\ARM\ARMCLANG\Bin\..\include\string.h \
+  D:\Keil\ARM\ARMCLANG\Bin\..\include\stdio.h \
+  D:\Keil\ARM\ARMCLANG\Bin\..\include\math.h

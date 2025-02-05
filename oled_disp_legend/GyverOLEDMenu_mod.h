@@ -248,6 +248,8 @@ public:
         case 7: drawIcon8x8(0); 
                 _oled->print("C");
                 break;
+        case 8: _oled->print(" kph");
+                break;
       }
 
       

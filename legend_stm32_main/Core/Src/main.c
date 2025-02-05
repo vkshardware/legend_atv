@@ -18,11 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "FlashPROM.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,7 +67,8 @@
 #define STATUS_BIT2_CURR1_R       6
 #define STATUS_BIT2_CURR2_R       7
 
-#define PARAMETERS 25
+#define PARAMETERS 28     //See also BUFFSIZE 28 in FlashPROM.h
+#define PAGES_COUNT 6
 #define STR_LENGTH 15*2 // 2 bytes per symbol
 
 
@@ -109,7 +110,7 @@ struct double_pwm{
 		uint8_t dc_fill;
 		bool enable;
 	  bool trigger;
-	  uint8_t duty_cycle;
+	  uint16_t duty_cycle;
 		GPIO_TypeDef * port_hi;
 	  uint16_t pin_hi;
 		GPIO_TypeDef * port_lo;
@@ -128,43 +129,62 @@ struct i2c_data_{
   uint8_t paramfromdisp_addr;
 };
 
+struct _ProcessChannel{
+  uint8_t gear_mode;
+	bool button_pressed;
+	struct double_pwm * pwm; 
+	uint16_t  duty_cycle; 
+	bool squeeze;
+	uint8_t * led;
+	uint8_t * strength;
+	uint8_t T_release;
+	uint8_t T_on;
+	uint16_t timer0;
+	uint16_t timer1;
+};
+
+
 struct MenuRow{
   uint8_t id;
+	char desc_cust[STR_LENGTH];
 	char desc_en[STR_LENGTH];
   uint8_t def;
   uint8_t min;
   uint8_t max;
   uint8_t writable; // 1- writable, 0 - readonly
   int8_t dp; //decimal point position
-  uint8_t symb; // 0 - null, 1 - c, 2 - %, 3- A, 4 - s, 5 - mc, 6 - ms, 7 - Celsius
+  uint8_t symb; // 0 - null, 1 - c, 2 - %, 3- A, 4 - s, 5 - mc, 6 - ms, 7 - Celsius, 8 - km/h
 };
 
 struct MenuRow menus[] = {
-  {1,"01 I L LOW",30,0,100,1,0,2},
-  {2,"02 I L MID",60,0,100,1,0,2},
-  {3,"03 I L HIGH",100,0,100,1,0,2},
-  {4,"04 I R LOW",30,0,100,1,0,2},
-  {5,"05 I R MID",60,0,100,1,0,2},
-  {6,"06 I R HIGH",100,0,100,1,0,2},
-  {7,"07 Trel. norm.",5,0,100,1,1,1},
-  {8,"08 Trel. water",20,0,100,1,1,1},
-  {9,"09 Act curr. L",0,0,0,0,0,3},
-  {10,"10 Act curr. R",0,0,0,0,0,3},
-  {11,"11 Tr_del. L",0,0,100,1,1,1},
-  {12,"12 Tr_del. R",0,0,100,1,1,1},
-  {13,"13 I parking P",15,0,100,1,0,2},
-  {14,"14 Temp fail",80,20,140,1,0,7},
-  {15,"15 Off on temp",1,0,1,1,0,0},
-  {16,"16 Iovercur. L",45,0,80,1,0,3},
-  {17,"17 Iovercur. R",45,0,80,1,0,3},
-  {18,"18 CAN speed",4,0,6,1,0,0},
-  {19,"19 CAN address",0x11,0x01,0xFE,1,0,0}, 
-  {20,"20 DI mode 1",0,0,1,0,0,0}, 
-  {21,"21 DI mode 2",0,0,1,0,0,0}, 
-	{22,"22 I Calibr L",40,10,200,1,0,1}, 
-	{23,"23 I Calibr R",40,10,200,1,0,1}, 
-  {24,"24 Firmware", 10,0,100,0,1,0},
-  {25,"25 Language",1,0,1,1,0,0},
+  {1,"01","01 I L LOW",30,0,100,1,0,2},
+  {2,"02","02 I L MID",60,0,100,1,0,2},
+  {3,"03","03 I L HIGH",100,0,100,1,0,2},
+  {4,"04","04 I R LOW",30,0,100,1,0,2},
+  {5,"05","05 I R MID",60,0,100,1,0,2},
+  {6,"06","06 I R HIGH",100,0,100,1,0,2},
+  {7,"07","07 Trel. norm.",5,0,100,1,1,1},
+  {8,"08","08 Trel. water",20,0,100,1,1,1},
+  {9,"09","09 Act curr. L",0,0,0,0,1,3},
+  {10,"10","10 Act curr. R",0,0,0,0,1,3},
+  {11,"11","11 Tr_del. L",0,0,50,1,1,1},
+  {12,"12","12 Tr_del. R",0,0,50,1,1,1},
+  {13,"13","13 I parking P",15,0,100,1,0,2},
+  {14,"14","14 Temp fail",80,20,140,1,0,7},
+  {15,"15","15 Off on temp",1,0,1,1,0,0},
+  {16,"16","16 Iovercur. L",45,0,80,1,0,3},
+  {17,"17","17 Iovercur. R",45,0,80,1,0,3},
+  {18,"18","18 CAN speed",4,0,6,1,0,0},
+  {19,"19","19 CAN address",0x11,0x01,0xFE,1,0,0}, 
+  {20,"20","20 DI mode 1",0,0,1,0,0,0}, 
+  {21,"21","21 DI mode 2",0,0,1,0,0,0}, 
+	{22,"22","22 I Calibr L",40,10,200,1,0,0}, 
+	{23,"23","23 I Calibr R",40,10,200,1,0,0}, 
+  {24,"24","24 Speed cal.",29,1,250,1,0,0},  
+  {25,"25","25 Firmware", 10,1,100,0,1,0},
+	{26,"26","26 Speed 1 st",  5,1,100,1,0,8},
+	{27,"27","27 Speed 2 st", 15,1,100,1,0,8},
+  {28,"28","28 Language",1,0,1,1,0,0},
 };
 
 /* USER CODE END PTD */
@@ -180,6 +200,9 @@ struct double_pwm pwm_R, pwm_L;
 uint16_t params_buf[PARAMETERS+1]; // zero byte - FLASH not erased info
 uint32_t res_addr = 0;
 uint32_t tick = 0;
+uint16_t speed_tick = 0;
+
+struct _ProcessChannel Channel_L, Channel_R;
 
 /* USER CODE END PD */
 
@@ -308,6 +331,19 @@ void AnalogAddValue(struct AnalogFilter * ana, uint16_t value)
 {
 	ana->in_value += value*value; // sum of squares
 	ana->time_count++;
+}
+
+void Init_Channels()
+{
+	Channel_L.timer0 = 0;
+	Channel_L.timer1 = 0;
+	Channel_L.pwm = &pwm_L;
+	Channel_L.strength = &main_data.Left_Strength;
+	
+	Channel_R.timer0 = 0;
+	Channel_R.timer1 = 0;	
+	Channel_R.pwm = &pwm_R;
+	Channel_R.strength = &main_data.Right_Strength;
 }
 
 void Init_i2c_data()
@@ -481,11 +517,6 @@ void InitSwitches(void)
 	  pb2.port = GPIOB;
 	  pb2.pin = GPIO_PIN_2;
 	  pb2.scanrate = 4;
-
-		pb15.outstate = false;
-	  pb15.port = GPIOB;
-	  pb15.pin = GPIO_PIN_15;
-	  pb15.scanrate = 4;
 		
 		pa8.outstate = false;
 	  pa8.port = GPIOA;
@@ -560,6 +591,82 @@ void DoublePWM(struct double_pwm * pwm) //HIGH and LOW transistors used to PWM
 	 }
 }
 
+
+void ProcessChannel(struct _ProcessChannel * channel)
+{
+	
+	if (channel->gear_mode == 0)  //Neutral
+	{
+		channel->pwm->duty_cycle = 0;
+		*channel->led = 0;
+	}
+	
+	if (channel->gear_mode == 1) //Parking
+	{
+		channel->pwm->duty_cycle = params_buf[13];
+		*channel->led = 1;
+	}
+	
+	if (channel->duty_cycle >= 97) channel->duty_cycle = 97; //Safety condition to charge BOOTSTRAP capacitor. 100% DC are not applicable
+	
+	
+	if (channel->gear_mode == 2) //Drive
+	{
+
+	
+  	if (channel->button_pressed) 
+	  {	
+			
+	    if (channel->T_release > 0)
+			{
+				channel->timer1 = 0;
+				
+	      if (channel->timer0 < channel->T_release*10)
+	      {
+		       channel->timer0++;
+					 channel->pwm->duty_cycle = (channel->T_release*10 - channel->timer0)*channel->duty_cycle/channel->T_release/10;  //formula DC_actual=(T_rel-T)*DC/Trel
+			 
+    	  } else
+				{		  		
+    				channel->pwm->duty_cycle = 0;
+        }						
+		    
+			
+			} 
+			else 
+			channel->pwm->duty_cycle = 0;
+		  
+			if (channel->pwm->duty_cycle == 0) *channel->led = 0;
+	  
+		}
+		else 
+		{
+			channel->timer0 = 0;
+			
+			if (channel->T_on> 0)
+			{
+				if (channel->timer1 < channel->T_on*10)
+				{
+						channel->timer1++;
+					  channel->pwm->duty_cycle = (channel->timer1)*channel->duty_cycle/channel->T_on/10;  //formula DC_actual=T*DC/Ton
+					  
+				} else
+				{		  		
+    				channel->pwm->duty_cycle = channel->duty_cycle;
+        }					
+			
+			} 
+			else 
+						channel->pwm->duty_cycle = channel->duty_cycle;
+			
+			*channel->led = 1;
+		}
+	}
+	
+	
+	if (channel->pwm->duty_cycle == 0) *channel->strength = 0; 
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim) // 100Hz Timer
 { 
 	if(htim->Instance == TIM3)
@@ -577,15 +684,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim) // 100Hz Timer
 		tick100Hz++;
 		
 		
-		//DI filter PA7,PB0,PB1,PB2,PB15,PA8,PA9,PA12
+		//DI filter PA7,PB0,PB1,PB2,PA8,PA9,PA12
 		_switch_filter(&pa7);  //Mode 1
 		_switch_filter(&pb0);  //Button L
 		_switch_filter(&pb1);  //Button R
 		_switch_filter(&pb2);  //Squeeze
-		_switch_filter(&pb15); //Speed
 		_switch_filter(&pa8);  //Mode 2
 		_switch_filter(&pa12); //Water
 		
+		ProcessChannel(&Channel_L); //LEFT channel processing
+	  ProcessChannel(&Channel_R); //RIGHT channel processing
+
 
 	}
 	
@@ -693,11 +802,18 @@ void UpdateStatus()
 	i2c_buf[6] = i2c_data.current_page;
 	
 	
-	// 5 current parameters at page						 
+	// current parameters at page						 
 	for (int i=0; i<5; i++)
 	{
-		if ((i2c_data.current_page > 0) && (i2c_data.current_page < 6))
-		   i2c_buf[7+i] = params_buf[i+1+(i2c_data.current_page-1)*5];
+		if ((i2c_data.current_page > 0) && (i2c_data.current_page <= 6))
+		{   
+		  int index = i+1+(i2c_data.current_page-1)*5;
+			
+			if (index <= PARAMETERS)
+			    i2c_buf[7+i] = params_buf[index];
+			else
+			    i2c_buf[7+i] = 0;
+		}
 		else
 			 i2c_buf[7+i] = 0;
 	}
@@ -753,23 +869,72 @@ bool CheckParamsLimits(uint16_t * params)
 void WriteDefsToFlash()
 {
 	params_buf[0] = 0;
-	for (int i = 1; i <= PARAMETERS;i++){
+	for (int i = 1; i <= PARAMETERS; i++){
 		  params_buf[i] = menus[i-1].def;
 	}
-	 
+	
 	write_to_flash(&params_buf[0]);
+
 }
 
-void ProcessButton(bool button_pressed, struct double_pwm * pwm, uint16_t  duty_cycle, bool squeeze)
+uint8_t SelectCurrentFromSpeed(uint8_t low_dc, uint8_t mid_dc, uint8_t high_dc, uint8_t * strength)
 {
-	if (button_pressed || squeeze) pwm->duty_cycle = duty_cycle; else 
-	            pwm->duty_cycle = 0;
+	uint8_t result = 0;
+	
+	if ((main_data.GP_Speed >= 0) && (main_data.GP_Speed < params_buf[26])){
+  		result = high_dc;  
+		  * strength = 3;
+	}
+	else
+	if ((main_data.GP_Speed >= params_buf[26]) && (main_data.GP_Speed < params_buf[27])){
+	  	result = mid_dc;
+      * strength = 2;		
+	}
+	else
+	if  (main_data.GP_Speed >= params_buf[27]) 
+	{
+		result = low_dc;
+		* strength = 1;
+  }		
+	
+	return result;
 }
+
+void UpdateChannelsData()
+{
+  Channel_L.button_pressed = pb0.outstate;
+	Channel_L.gear_mode = main_data.selector_mode;
+	Channel_L.duty_cycle = SelectCurrentFromSpeed(params_buf[1],params_buf[2],params_buf[3], &main_data.Left_Strength);
+	
+
+	Channel_L.squeeze = pb2.outstate;
+	Channel_L.led = &main_data.Left_On;
+	Channel_L.T_release = params_buf[11];
+
+  Channel_R.button_pressed = pb1.outstate;
+	Channel_R.gear_mode = main_data.selector_mode;
+	Channel_R.duty_cycle = SelectCurrentFromSpeed(params_buf[4],params_buf[5],params_buf[6], &main_data.Right_Strength);
+	
+	Channel_R.squeeze = pb2.outstate;
+	Channel_R.led = &main_data.Right_On;	
+	Channel_R.T_release = params_buf[12];
+	
+	if (main_data.Water_mode) //Watermode current up
+	{
+	    Channel_L.T_on = params_buf[8];
+	    Channel_R.T_on = params_buf[8];
+	}
+  else //Normal current up
+	{
+		  Channel_L.T_on = params_buf[7];
+	    Channel_R.T_on = params_buf[7];
+	}
+}
+
 
 void ProcessDIevents()
 {
-	ProcessButton(pb0.outstate, &pwm_L, params_buf[1], pb2.outstate);
-	ProcessButton(pb1.outstate, &pwm_R, params_buf[4], pb2.outstate);
+
 
 	if (pb0.outstate) //Button L
 	{
@@ -793,11 +958,15 @@ void ProcessDIevents()
 	
 	if (pa7.outstate) //DI Mode 1
 	{
-    
-		pwm_L.duty_cycle = params_buf[1];
-		pwm_R.duty_cycle = params_buf[4];
-	        			
-	} 
+    main_data.DI_mode1 = 1;  
+	}
+	else
+	{
+		main_data.DI_mode1 = 0;
+	}
+		
+	params_buf[20] = main_data.DI_mode1;
+	
 	
 	if (pb2.outstate) //Squeeze
 	{
@@ -807,13 +976,16 @@ void ProcessDIevents()
 		main_data.Squeeze_mode  = 0;
 	}
 	
-	if (pa8.outstate) //Mode 2
+	if (pa8.outstate) //DI Mode 2
 	{
 		main_data.DI_mode2 = 1;
 	} else
 	{
 		main_data.DI_mode2  = 0;
+		
 	}
+	
+	params_buf[21] = main_data.DI_mode2;
 	
 	if (pa12.outstate) //Water
 	{
@@ -823,6 +995,18 @@ void ProcessDIevents()
 		main_data.Water_mode  = 0;
 	}
 	
+  main_data.gear = (1 << STATUS_BIT2_GEAR_N);
+	main_data.selector_mode = 0;
+	
+	if (main_data.DI_mode1) {
+		  main_data.gear = (1 << STATUS_BIT2_GEAR_P);
+		  main_data.selector_mode = 1;
+	}
+	
+  if (main_data.DI_mode2) {
+		  main_data.gear = (1 << STATUS_BIT2_GEAR_D);
+		  main_data.selector_mode = 2;
+	}	
 }
 
 int16_t ADC_to_Celsius(int16_t adc)
@@ -833,11 +1017,59 @@ int16_t ADC_to_Celsius(int16_t adc)
 		return -127;
 	
 	if (adc >= 640)	
-	  result = -0.00000714*adc*adc-0.0104*adc+76.5; //cold temperature curve approximation
+	  result = -0.00000714*adc*adc-0.0104*adc+76.5; //cold temperature curve approximation 
 	else
 	  result = 0.0014*adc*adc-1.5857*adc+513.13; //high temperature curve approximation
 	
 	return (int16_t) roundf(result); 
+}
+
+void CANsendmsg()
+{
+	CAN_TxHeaderTypeDef msgHeader;
+  uint8_t msgData[8];
+
+	if (params_buf[18] == 0) return;
+	
+  if (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) != 0)
+  {
+
+    msgHeader.StdId = params_buf[19]; //CAN bus node address
+    msgHeader.DLC = 8;
+    msgHeader.TransmitGlobalTime = DISABLE;
+    msgHeader.RTR = CAN_RTR_DATA;
+    msgHeader.IDE = CAN_ID_STD;
+    
+    uint32_t mailBoxNum = 0;
+		
+		msgData[0] = i2c_data.statusbyte0;
+		msgData[1] = i2c_data.statusbyte1;
+		msgData[2] = i2c_data.statusbyte2;
+		msgData[3] = (int8_t)  i2c_data.GP_temp;
+	  msgData[4] = (uint8_t) i2c_data.GP_Speed;
+		
+		msgData[5] = params_buf[9];  //current L
+		msgData[6] = params_buf[10]; //current R
+    
+    HAL_CAN_AddTxMessage(&hcan, &msgHeader, &msgData[0], &mailBoxNum);
+  }
+}
+
+void ScanSpeedSensor()
+{
+	bool value;
+	static bool old_value;
+  
+	uint16_t result = 0;
+		
+	value = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_15);
+	
+	if (value && !old_value) //RISING EDGE
+	{
+    speed_tick++;
+	}
+	
+	old_value = value;
 }
 
 
@@ -851,8 +1083,9 @@ int16_t ADC_to_Celsius(int16_t adc)
   */
 int main(void)
 {
-	uint32_t timer_ms, timer_analog = 0;
   /* USER CODE BEGIN 1 */
+  uint32_t timers[8];
+	
 
   /* USER CODE END 1 */
 
@@ -869,6 +1102,23 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+	
+	res_addr = flash_search_adress(STARTADDR, PARAMETERS * DATAWIDTH);
+	read_last_data_in_flash(&params_buf[0]); 
+	 
+	if (params_buf[0] == 0xFFFF)
+	{
+		erase_flash();
+		HAL_Delay(5);
+		WriteDefsToFlash();
+	}
+	if (!CheckParamsLimits(&params_buf[0]))
+	{
+		
+		
+		WriteDefsToFlash();
+		
+	}	
 
   /* USER CODE END SysInit */
 
@@ -882,36 +1132,48 @@ int main(void)
   MX_TIM4_Init();
   MX_I2C2_Init();
   MX_CRC_Init();
-	
   /* USER CODE BEGIN 2 */
+	
+	
+	for (int j=0; j<8; j++)
+	     timers[j] = 0;	
+	
 	InitMainScreenSet();
 	InitPWM();
 	Init_i2c_data();
+	Init_Channels();
+	UpdateChannelsData();
+	
 	HAL_TIM_Base_Start_IT(&htim3);		
 	HAL_TIM_Base_Start_IT(&htim4);	
 	
 	InitAnalogPins();
 	InitSwitches();	
 	
+
 	
-	res_addr = flash_search_adress(STARTADDR, BUFFSIZE * DATAWIDTH);
-	read_last_data_in_flash(&params_buf[0]); 
+	CAN_FilterTypeDef canFilterConfig;
+  canFilterConfig.FilterBank = 0;
+  canFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
+  canFilterConfig.FilterScale = CAN_FILTERSCALE_32BIT;
+  canFilterConfig.FilterIdHigh = 0x0000;
+  canFilterConfig.FilterIdLow = 0x0000;
+  canFilterConfig.FilterMaskIdHigh = 0x0000;
+  canFilterConfig.FilterMaskIdLow = 0x0000;
+  canFilterConfig.FilterFIFOAssignment = CAN_RX_FIFO0;
+  canFilterConfig.FilterActivation = ENABLE;
+  canFilterConfig.SlaveStartFilterBank = 14;
+  HAL_CAN_ConfigFilter(&hcan, &canFilterConfig);
+  
 	
-	if (params_buf[0] == 0xFFFF)
+	if (params_buf[18] > 0)
 	{
-		erase_flash();
-		HAL_Delay(5);
-		WriteDefsToFlash();
-	}
+    HAL_CAN_Start(&hcan);
+    HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
+  }
 	
-	if (!CheckParamsLimits(&params_buf[0]))
-	{
-		WriteDefsToFlash();
-		HAL_Delay(5);
-	}
 
-
-
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -922,79 +1184,101 @@ int main(void)
 		AnalogAddValue(&pa[0], GetADC1_Value(ADC_CHANNEL_0)); //CS_L
 		AnalogAddValue(&pa[1], GetADC1_Value(ADC_CHANNEL_1)); //CS_R
 		AnalogAddValue(&pa[4], GetADC1_Value(ADC_CHANNEL_4)); //TEMP0
+		
+		
 		//pa[2].in_value = GetADC1_Value(ADC_CHANNEL_2);  //SEARCH_L
 		//pa[3].in_value = GetADC1_Value(ADC_CHANNEL_3);  //SEARCH_R
 
 		//pa[5].in_value = GetADC1_Value(ADC_CHANNEL_5);  //ANALOG 1
 		//pa[6].in_value = GetADC1_Value(ADC_CHANNEL_6);  //ANALOG 2		
 
+		ScanSpeedSensor();
 		
 		
-		if (tick100Hz % 10 == 0) //0.1 sec
+		if ((HAL_GetTick() - timers[0]) > 100) //0.1 sec
 		{ 
 			UpdateStatus();
+			UpdateChannelsData();
 			ProcessDIevents();
+			
+			timers[0] = HAL_GetTick();		
+      temp0++;			
+
 		}
 		
-		if (tick100Hz % 25 == 0) //0.25 sec
+
+		
+		if ((HAL_GetTick() - timers[1]) > 150) //0.15 sec
 		{	
-  	  
 			HAL_I2C_Master_Transmit(&hi2c2, (I2C_SLAVE_ADDRESS << 1), &i2c_buf[0], I2C_BUFFER,  I2C_TIMEOUT);
 			
+			CANsendmsg();
+			timers[1] = HAL_GetTick();	
 		}
 		
 		
-		if ((HAL_GetTick() - timer_analog) > 5) //every 5 ms
+		if ((HAL_GetTick() - timers[2]) > 5) //every 5 ms
 		{			
-
-			
-			timer_analog = HAL_GetTick();
+			timers[2] = HAL_GetTick();
 		}
 
 		
-		if ((HAL_GetTick() - timer_ms) > 300) //0.3 sec
+		if ((HAL_GetTick() - timers[3]) > 300) //0.3 sec
 		{
 			AnalogAverage(&pa[0]);
 			AnalogAverage(&pa[1]);
 			AnalogAverage(&pa[4]);
+
 			
 
 			params_buf[9] = pa[0].out_value/params_buf[22]; //Actual Current L
 			
 			params_buf[10] = pa[1].out_value/params_buf[23]; //Actual Current R
 			
-			main_data.GP_Speed = pa[1].out_value;
 			main_data.GP_Temp = ADC_to_Celsius(pa[4].out_value);   //Temperature of GP
-			
-			
 			main_data.OverTemp = (main_data.GP_Temp >= params_buf[14]);
 			
 			if ((params_buf[15] == 1) && main_data.OverTemp) //Overheat
 			{
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); // DO_ERROR
+				//main_data.DO_error = true;
 				pwm_R.enable = false;
 				pwm_L.enable = false;
 			} else
 			{
 			  pwm_R.enable = true;
 				pwm_L.enable = true;
-				HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+				//main_data.DO_error = false;
 			}
 			 
-			timer_ms = HAL_GetTick();
+			timers[3] = HAL_GetTick();
 		}
 		
 		
-		if (tick100Hz > 80) //0.80 sec
+		if ((HAL_GetTick() - timers[4]) > 500) //0.50 sec
 		{
-			
-						
+					
 			HAL_I2C_Master_Receive_IT(&hi2c2, (I2C_SLAVE_ADDRESS << 1), &i2c_receive[0], I2C_BUFFER);
 			i2c_data.current_page 			= i2c_receive[1];
 			i2c_data.paramfromdisp 			= i2c_receive[2];
 			i2c_data.paramfromdisp_addr = i2c_receive[3];
 			
-			tick100Hz = 0;
+			if (params_buf[24] > 0)
+    			main_data.GP_Speed = speed_tick*20/params_buf[24];
+		
+			speed_tick = 0;
+			
+			timers[4] = HAL_GetTick();
+			
+		}
+		
+		if ((HAL_GetTick() - timers[5]) > 1000) //1.0 sec
+		{
+		  main_data.DO_error = !main_data.DO_error;
+			
+			if (main_data.DO_error) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); else
+		                          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+			
+			timers[5] = HAL_GetTick();
 		}
 
 		
@@ -1111,14 +1395,19 @@ static void MX_CAN_Init(void)
   /* USER CODE END CAN_Init 0 */
 
   /* USER CODE BEGIN CAN_Init 1 */
+	
+	if (params_buf[18] > 0)
+	  hcan.Init.Prescaler = params_buf[18]*2; //params_buf[18] = 4 (125kbps), 3 (166kbps), 2 (250kbps), 1 (500kbps)
+	else 
+		hcan.Init.Prescaler = 8;
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 16;
+  //hcan.Init.Prescaler = 8;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
-  hcan.Init.TimeSeg1 = CAN_BS1_1TQ;
-  hcan.Init.TimeSeg2 = CAN_BS2_1TQ;
+  hcan.Init.TimeSeg1 = CAN_BS1_8TQ;
+  hcan.Init.TimeSeg2 = CAN_BS2_7TQ;
   hcan.Init.TimeTriggeredMode = DISABLE;
   hcan.Init.AutoBusOff = DISABLE;
   hcan.Init.AutoWakeUp = DISABLE;
@@ -1130,6 +1419,8 @@ static void MX_CAN_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN CAN_Init 2 */
+	
+
 
   /* USER CODE END CAN_Init 2 */
 
@@ -1242,7 +1533,7 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 100;
+  htim3.Init.Prescaler = 1000;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 160;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

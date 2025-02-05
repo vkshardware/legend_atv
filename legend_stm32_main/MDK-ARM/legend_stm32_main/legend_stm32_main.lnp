@@ -1,9 +1,9 @@
 --cpu Cortex-M3
 "legend_stm32_main\startup_stm32f103xb.o"
+"legend_stm32_main\flashprom.o"
 "legend_stm32_main\main.o"
 "legend_stm32_main\stm32f1xx_it.o"
 "legend_stm32_main\stm32f1xx_hal_msp.o"
-"legend_stm32_main\flashprom.o"
 "legend_stm32_main\stm32f1xx_hal_gpio_ex.o"
 "legend_stm32_main\stm32f1xx_hal_adc.o"
 "legend_stm32_main\stm32f1xx_hal_adc_ex.o"

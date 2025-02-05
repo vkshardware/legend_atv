@@ -26,7 +26,7 @@
 
 #define WAIT_100HZ 0xB1  // Timer2 100Hz
 
-#define PARAMETERS 25
+#define PARAMETERS 28
 
 
 
@@ -104,42 +104,45 @@ struct MainScreenSet{
 
 struct MenuRow{
   uint8_t id;
-  char desc_ru[STR_LENGTH];
+  char desc_cust[STR_LENGTH];
   char desc_en[STR_LENGTH];
   uint8_t def;
   uint8_t min;
   uint8_t max;
   uint8_t writable; // 1- writable, 0 - readonly
   int8_t dp; //decimal point position
-  uint8_t symb; // 0 - null, 1 - c, 2 - %, 3- A, 4 - s, 5 - mc, 6 - ms, 7 - Celsius
+  uint8_t symb; // 0 - null, 1 - c, 2 - %, 3- A, 4 - s, 5 - mc, 6 - ms, 7 - Celsius, 8 - km/h
 };
 
 const MenuRow menus[] PROGMEM = {
-  {1,"01 Ток L LOW","01 I L LOW",30,0,100,1,0,2},
-  {2,"02 Ток L MID","02 I L MID",60,0,100,1,0,2},
-  {3,"03 Ток L HIGH","03 I L HIGH",100,0,100,1,0,2},
-  {4,"04 Ток R LOW","04 I R LOW",30,0,100,1,0,2},
-  {5,"05 Ток R MID","05 I R MID",60,0,100,1,0,2},
-  {6,"06 Ток R HIGH","06 I R HIGH",100,0,100,1,0,2},
-  {7,"07 Тотпуск. норм.","07 Trel. norm.",5,0,100,1,1,1},
-  {8,"08 Tотпуск. вода","08 Trel. water",20,0,100,1,1,1},
-  {9,"09 Акт. ток L","09 Act curr. L",0,0,0,0,1,3},
-  {10,"10 Акт. ток R","10 Act curr. R",0,0,0,0,1,3},
-  {11,"11 Тзад. отп L","11 Tr_del. L",0,0,100,1,1,1},
-  {12,"12 Тзад. отп R","12 Tr_del. R",0,0,100,1,1,1},
-  {13,"13 Ток парк. P","13 I parking P",15,0,100,1,0,2},
-  {14,"14 Темп. авария","14 Temp fail",80,20,140,1,0,7},
-  {15,"15 Откл темп.","15 Off on temp",1,0,1,1,0,0},
-  {16,"16 Iкз. L","16 Iovercur. L",45,0,80,1,0,3},
-  {17,"17 Iкз. R","17 Iovercur. R",45,0,80,1,0,3},
-  {18,"18 CAN скор.","18 CAN speed",4,0,6,1,0,0},
-  {19,"19 CAN адр.","19 CAN address",0x11,0x01,0xFE,1,0,0}, 
-  {20,"20 ВХ Mode 1","20 DI mode 1",0,0,1,0,0,0}, 
-  {21,"21 ВХ Mode 2","21 DI mode 2",0,0,1,0,0,0}, 
-	{22,"22 Калибр I L","22 I Calibr L",40,10,200,1,0,0}, 
-	{23,"23 Калибр I R","23 I Calibr R",40,10,200,1,0,0}, 
-  {24,"24 Прошивка","24 Firmware", 10,0,100,0,1,0},
-  {25,"25 Язык", "25 Language",1,0,1,1,0,0},
+   {1,"01","01 I L LOW",30,0,100,1,0,2},
+  {2,"02","02 I L MID",60,0,100,1,0,2},
+  {3,"03","03 I L HIGH",100,0,100,1,0,2},
+  {4,"04","04 I R LOW",30,0,100,1,0,2},
+  {5,"05","05 I R MID",60,0,100,1,0,2},
+  {6,"06","06 I R HIGH",100,0,100,1,0,2},
+  {7,"07","07 Trel. norm.",5,0,100,1,1,1},
+  {8,"08","08 Trel. water",20,0,100,1,1,1},
+  {9,"09","09 Act curr. L",0,0,0,0,1,3},
+  {10,"10","10 Act curr. R",0,0,0,0,1,3},
+  {11,"11","11 Tr_del. L",0,0,50,1,1,1},
+  {12,"12","12 Tr_del. R",0,0,50,1,1,1},
+  {13,"13","13 I parking P",15,0,100,1,0,2},
+  {14,"14","14 Temp fail",80,20,140,1,0,7},
+  {15,"15","15 Off on temp",1,0,1,1,0,0},
+  {16,"16","16 Iovercur. L",45,0,80,1,0,3},
+  {17,"17","17 Iovercur. R",45,0,80,1,0,3},
+  {18,"18","18 CAN speed",4,0,6,1,0,0},
+  {19,"19","19 CAN address",0x11,0x01,0xFE,1,0,0}, 
+  {20,"20","20 DI mode 1",0,0,1,0,0,0}, 
+  {21,"21","21 DI mode 2",0,0,1,0,0,0}, 
+	{22,"22","22 I Calibr L",40,10,200,1,0,0}, 
+	{23,"23","23 I Calibr R",40,10,200,1,0,0}, 
+  {24,"24","24 Speed cal.",29,1,250,1,0,0},  
+  {25,"25","25 Firmware", 10,1,100,0,1,0},
+	{26,"26","26 Speed 1 st",5,1,100,1,0,8},
+	{27,"27","27 Speed 2 st",15,1,100,1,0,8},
+  {28,"28","28 Language",1,0,1,1,0,0},
 };
 
 MainScreenSet main_oled;
@@ -311,7 +314,7 @@ void MainScreen(MainScreenSet * screen)
   
   switch(screen->Left_Strength)
   {
-     case 0:  if (lang_eeprom == 0) oled.print(F("ОТКЛ")); else oled.print(F("OFF"));
+     case 0:  if (lang_eeprom == 0) oled.print(F("ОТКл")); else oled.print(F("OFF"));
               break;
      case 1:  if (lang_eeprom == 0) oled.print(F("НИЗ")); else oled.print(F("LOW"));
               break;
@@ -397,7 +400,7 @@ void MainScreen(MainScreenSet * screen)
     if (lang_eeprom == 0) oled.print(F("ВЫЖИМ")); else oled.print(F("SQUEEZE"));
   }
 
-   oled.setCursorXY(80, 30);
+   oled.setCursorXY(78, 30);
    oled.setScale(2);
   
 
@@ -484,9 +487,6 @@ void UpdateParams()
   //if ((requested_menu > 0) && (requested_menu < 6))
       //params_buf[BuffAddrFromDataAddr(i2c_data.paramtodisp_addr)] = i2c_data.paramtodisp; 
 
-
-
-
   for (i = 0; i < 5; i++)
   {
     if (menu_page > 0)
@@ -508,9 +508,9 @@ void UpdateParams()
    // params_buf[i]=pgm_read_byte(&menus[j].def);
   }
 
-  if (menu_page == 5) 
+  if (menu_page == 6) 
   {
-     params_buf[(PARAMETERS-1)%5] = lang_eeprom;                     //25 parameter
+     params_buf[(PARAMETERS-1)%5] = lang_eeprom;                     //28 parameter
   }
       
 }
@@ -532,7 +532,7 @@ void UpdateTextBuf()
     if (j >= PARAMETERS) strcpy(&param_text[i][0], "");
     else
     {
-      if (lang_eeprom == 0) strlcpy_P(&param_text[i][0], menus[j].desc_ru,STR_LENGTH);
+      if (lang_eeprom == 0) strlcpy_P(&param_text[i][0], menus[j].desc_cust,STR_LENGTH);
       else
                             strlcpy_P(&param_text[i][0], menus[j].desc_en,STR_LENGTH);
 
@@ -549,8 +549,8 @@ void BuildMenu(void)
   UpdateTextBuf();
   UpdateParams();
   
-  if (lang_eeprom == 0)  menu.addItem("<--  ВЫХОД");
-  if (lang_eeprom == 1)  menu.addItem("<--  EXIT");
+  if (lang_eeprom == 0)  menu.addItem("<-- ВЫХОД");
+  if (lang_eeprom == 1)  menu.addItem("<-- EXIT");
 
   for (i = 0; i < 5; i++)
   {
@@ -588,6 +588,8 @@ void Update_status()
   if (i2c_data.statusbyte1 & (1 << STATUS_BIT1_R_TRIP_STAGE2)) main_oled.Left_fault+=2;  
         
   main_oled.Squeeze_mode=i2c_data.statusbyte0 & (1 << STATUS_BIT0_SQUEEZE);  
+
+  main_oled.selector_mode = 0;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_P)) main_oled.selector_mode = 1;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_R)) main_oled.selector_mode = 2;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_N)) main_oled.selector_mode = 3;
@@ -670,7 +672,7 @@ void onItemChange(const int index, const void* val, const byte valType) {
 boolean onItemPrintOverride(const int index, const void* val, const byte valType) {
 
   if (index > 0)
-  if (!((index >=6) && (menu_page == 5)))
+  if (!((index >=4) && (menu_page == 6)))
       return false;
       
 
@@ -725,7 +727,9 @@ void menu_page_select(int index)
     case 18 ... 23: menu_page = 4;
                     break;
     case 24 ... 29: menu_page = 5;
-                    break;        
+                    break;     
+    case 30 ... 35: menu_page = 6;
+                    break;    
   }
 
 }
@@ -735,7 +739,7 @@ void DownButton()
   if (menu_visible)
   {
   
-        if (menu_index < PARAMETERS+4) //PARAMETERS+5-1. 5 EXIT titles
+        if (menu_index < PARAMETERS+5) //PARAMETERS+5-1. 5 EXIT titles
         {
           if (!Setup_param)
           {
@@ -781,7 +785,7 @@ void UpButton()
   {    
         if (menu_index == 0) 
         {
-           menu_index = PARAMETERS+4;    
+           menu_index = PARAMETERS+5;    
         }
         else
         if (menu_index > 0) 
@@ -797,11 +801,11 @@ void UpButton()
         //UpdateParams();
         menu.refresh();
 
-        if (menu_index == PARAMETERS+4)
+        if (menu_index == PARAMETERS+5)
         {
           if (!Setup_param)
           {
-            menu.gotoIndex_(5); 
+            menu.gotoIndex_(3); 
           } else
            menu.selectNext(0);
 
@@ -902,7 +906,7 @@ void loop() {
 
           if (old_param_value != params_buf[addr]) {
 
-            if ((menu_page == 5) && (addr == (PARAMETERS-1)%5)){ //23 parameter
+            if ((menu_page == 6) && (addr == (PARAMETERS-1)%5)){ //26 parameter
               lang_eeprom = params_buf[addr];
               EEPROM.put(0, lang_eeprom);
 
