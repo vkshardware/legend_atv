@@ -1,9 +1,9 @@
 Dependencies for Project 'legend_stm32_main', Target 'legend_stm32_main': (DO NOT MODIFY !)
 CompilerVersion: 6190000::V6.19::ARMCLANG
 F (startup_stm32f103xb.s)(0x677F4492)(--target=arm-arm-none-eabi -mcpu=cortex-m3 -masm=auto  -Wa,armasm,--diag_suppress=A1950W -c-gdwarf-4 -Wa,armasm,--pd,"__EVAL SETA 1"-I./RTE/_legend_stm32_main-ID:/Keil/pack/ARM/CMSIS/5.9.0/CMSIS/Core/Include-ID:/Keil/pack/Keil/STM32F1xx_DFP/2.4.0/Device/Include-Wa,armasm,--pd,"__UVISION_VERSION SETA 538" -Wa,armasm,--pd,"_RTE_ SETA 1" -Wa,armasm,--pd,"STM32F10X_MD SETA 1" -Wa,armasm,--pd,"_RTE_ SETA 1"-o legend_stm32_main/startup_stm32f103xb.o)
-F (..\Core\Inc\FlashPROM.h)(0x67A395D3)()
+F (..\Core\Inc\FlashPROM.h)(0x67A62E60)()
 F (..\Core\Src\FlashPROM.c)(0x67644B78)(-xc -std=c99 --target=arm-arm-none-eabi -mcpu=cortex-m3 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__EVAL -gdwarf-4 -O3 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../Core/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I ../Drivers/CMSIS/Include-I./RTE/_legend_stm32_main-ID:/Keil/pack/ARM/CMSIS/5.9.0/CMSIS/Core/Include-ID:/Keil/pack/Keil/STM32F1xx_DFP/2.4.0/Device/Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32F10X_MD -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F103xB-o legend_stm32_main/flashprom.o -MD)
-I (..\Core\Inc\FlashPROM.h)(0x67A395D3)
+I (..\Core\Inc\FlashPROM.h)(0x67A62E60)
 I (..\Core\Inc\main.h)(0x66D67EDD)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal.h)(0x66D5B793)
 I (..\Core\Inc\stm32f1xx_hal_conf.h)(0x67643457)
@@ -42,7 +42,7 @@ I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_tim_ex.h)(0x66D5B793)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_uart.h)(0x66D5B793)
 I (D:\Keil\ARM\ARMCLANG\include\string.h)(0x63885718)
 I (D:\Keil\ARM\ARMCLANG\include\stdio.h)(0x63885718)
-F (../Core/Src/main.c)(0x67A3AC24)(-xc -std=c99 --target=arm-arm-none-eabi -mcpu=cortex-m3 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__EVAL -gdwarf-4 -O3 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../Core/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I ../Drivers/CMSIS/Include-I./RTE/_legend_stm32_main-ID:/Keil/pack/ARM/CMSIS/5.9.0/CMSIS/Core/Include-ID:/Keil/pack/Keil/STM32F1xx_DFP/2.4.0/Device/Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32F10X_MD -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F103xB-o legend_stm32_main/main.o -MD)
+F (../Core/Src/main.c)(0x67A64193)(-xc -std=c99 --target=arm-arm-none-eabi -mcpu=cortex-m3 -c-fno-rtti -funsigned-char -fshort-enums -fshort-wchar-D__EVAL -gdwarf-4 -O3 -ffunction-sections -Wno-packed -Wno-missing-variable-declarations -Wno-missing-prototypes -Wno-missing-noreturn -Wno-sign-conversion -Wno-nonportable-include-path -Wno-reserved-id-macro -Wno-unused-macros -Wno-documentation-unknown-command -Wno-documentation -Wno-license-management -Wno-parentheses-equality -Wno-reserved-identifier -I ../Core/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc -I ../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I ../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I ../Drivers/CMSIS/Include-I./RTE/_legend_stm32_main-ID:/Keil/pack/ARM/CMSIS/5.9.0/CMSIS/Core/Include-ID:/Keil/pack/Keil/STM32F1xx_DFP/2.4.0/Device/Include-D__UVISION_VERSION="538" -D_RTE_ -DSTM32F10X_MD -D_RTE_ -DUSE_HAL_DRIVER -DSTM32F103xB-o legend_stm32_main/main.o -MD)
 I (..\Core\Inc\main.h)(0x66D67EDD)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal.h)(0x66D5B793)
 I (..\Core\Inc\stm32f1xx_hal_conf.h)(0x67643457)
@@ -79,7 +79,7 @@ I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_pwr.h)(0x66D5B793)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_tim.h)(0x66D5B793)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_tim_ex.h)(0x66D5B793)
 I (..\Drivers\STM32F1xx_HAL_Driver\Inc\stm32f1xx_hal_uart.h)(0x66D5B793)
-I (..\Core\Inc\FlashPROM.h)(0x67A395D3)
+I (..\Core\Inc\FlashPROM.h)(0x67A62E60)
 I (D:\Keil\ARM\ARMCLANG\include\string.h)(0x63885718)
 I (D:\Keil\ARM\ARMCLANG\include\stdio.h)(0x63885718)
 I (D:\Keil\ARM\ARMCLANG\include\math.h)(0x63885718)

@@ -59,7 +59,7 @@
 
 //status byte 2
 #define STATUS_BIT2_GEAR_P        0
-#define STATUS_BIT2_GEAR_R        1
+#define STATUS_BIT2_FORCE         1
 #define STATUS_BIT2_GEAR_N        2
 #define STATUS_BIT2_GEAR_D        3
 #define STATUS_BIT2_CURR1_L       4
@@ -67,7 +67,7 @@
 #define STATUS_BIT2_CURR1_R       6
 #define STATUS_BIT2_CURR2_R       7
 
-#define PARAMETERS 28     //See also BUFFSIZE 28 in FlashPROM.h
+#define PARAMETERS 30     //See also BUFFSIZE 30 in FlashPROM.h
 #define PAGES_COUNT 6
 #define STR_LENGTH 15*2 // 2 bytes per symbol
 
@@ -84,6 +84,8 @@ struct AnalogFilter{
 
 struct SwitchFilter{
 	bool outstate;
+	bool lock;
+	bool trigger;
 	uint16_t scanrate;
 	GPIO_TypeDef * port;
 	uint16_t pin;
@@ -135,10 +137,12 @@ struct _ProcessChannel{
 	struct double_pwm * pwm; 
 	uint16_t  duty_cycle; 
 	bool squeeze;
+	bool force;
 	uint8_t * led;
 	uint8_t * strength;
 	uint8_t T_release;
 	uint8_t T_on;
+	bool fault;
 	uint16_t timer0;
 	uint16_t timer1;
 };
@@ -172,8 +176,8 @@ struct MenuRow menus[] = {
   {13,"13","13 I parking P",15,0,100,1,0,2},
   {14,"14","14 Temp fail",80,20,140,1,0,7},
   {15,"15","15 Off on temp",1,0,1,1,0,0},
-  {16,"16","16 Iovercur. L",45,0,80,1,0,3},
-  {17,"17","17 Iovercur. R",45,0,80,1,0,3},
+  {16,"16","16 Iovercur. L",15,0,30,1,0,3},
+  {17,"17","17 Iovercur. R",15,0,30,1,0,3},
   {18,"18","18 CAN speed",4,0,6,1,0,0},
   {19,"19","19 CAN address",0x11,0x01,0xFE,1,0,0}, 
   {20,"20","20 DI mode 1",0,0,1,0,0,0}, 
@@ -182,9 +186,11 @@ struct MenuRow menus[] = {
 	{23,"23","23 I Calibr R",40,10,200,1,0,0}, 
   {24,"24","24 Speed cal.",29,1,250,1,0,0},  
   {25,"25","25 Firmware", 10,1,100,0,1,0},
-	{26,"26","26 Speed 1 st",  5,1,100,1,0,8},
+	{26,"26","26 Speed 1 st",  3,1,100,1,0,8},
 	{27,"27","27 Speed 2 st", 15,1,100,1,0,8},
-  {28,"28","28 Language",1,0,1,1,0,0},
+	{28,"28","28 DI SQ/FORCE", 1,0,1,1,0,0},
+	{29,"29","29 DI WTR/FUNC", 1,0,1,1,0,0},
+  {30,"30","30 Language",1,0,1,1,0,0},
 };
 
 /* USER CODE END PTD */
@@ -201,6 +207,7 @@ uint16_t params_buf[PARAMETERS+1]; // zero byte - FLASH not erased info
 uint32_t res_addr = 0;
 uint32_t tick = 0;
 uint16_t speed_tick = 0;
+uint16_t adc_curr_L, adc_curr_R = 0; 
 
 struct _ProcessChannel Channel_L, Channel_R;
 
@@ -237,6 +244,7 @@ struct MainDataSet{
   uint16_t GP_Speed;
   bool Water_mode;
   bool Squeeze_mode;
+	bool Force_mode;
   bool Left_button;
   bool Right_button;
   uint8_t Right_Strength;       // Empty, LOW, MID, HIGH
@@ -261,7 +269,7 @@ struct MainDataSet{
 struct MainDataSet main_data;
 struct i2c_data_ i2c_data;
 uint8_t tick100Hz = 0;
-uint16_t  temp0 = 0;
+uint16_t  temp0, temp2 = 0;
 long temp1 = 0;
 
 /* USER CODE END PV */
@@ -337,11 +345,15 @@ void Init_Channels()
 {
 	Channel_L.timer0 = 0;
 	Channel_L.timer1 = 0;
+	Channel_L.fault = false;
+	Channel_L.force = false;
 	Channel_L.pwm = &pwm_L;
 	Channel_L.strength = &main_data.Left_Strength;
 	
 	Channel_R.timer0 = 0;
 	Channel_R.timer1 = 0;	
+	Channel_R.fault = false;
+	Channel_R.force = false;
 	Channel_R.pwm = &pwm_R;
 	Channel_R.strength = &main_data.Right_Strength;
 }
@@ -393,6 +405,7 @@ void InitMainScreenSet()
   main_data.Right_Strength = 0;
 
   main_data.Squeeze_mode = false;
+	main_data.Force_mode = false;
   main_data.Water_mode = false;
   main_data.selector_mode = 0;
 	main_data.Left_On = 0;
@@ -476,7 +489,9 @@ bool _switch_filter(struct SwitchFilter * source)
 	{
 		if (source->curr_scan >= source->scanrate){	
 		    
+			
 			source->outstate = true;
+			source->trigger = true;
 		} else
 	
 		source->curr_scan++;
@@ -485,9 +500,15 @@ bool _switch_filter(struct SwitchFilter * source)
 		if  (source->scanrate == 0xFFFF) source->curr_scan = 0;
 		
 	} else
-	{
+	{ 
 	    source->curr_scan = 0;	
 			source->outstate = false;
+		
+		  if (source->trigger) 
+			{ 
+				source->lock = false;
+				source->trigger = false;
+			}
 	}
 
 	
@@ -499,31 +520,43 @@ void InitSwitches(void)
 	 //DI filter PA7,PB0,PB1,PB2,PB15,PA8,PA9,PA12
 
 		pa7.outstate = false;
+	  pa7.lock = false;
+	  pa7.trigger = false;
 	  pa7.port = GPIOA;
 	  pa7.pin = GPIO_PIN_7;
 	  pa7.scanrate = 4;
 	
 		pb0.outstate = false;
+	  pb0.lock = false;
+	  pb0.trigger = false;
 	  pb0.port = GPIOB;
 	  pb0.pin = GPIO_PIN_0;
 	  pb0.scanrate = 4;
 
 		pb1.outstate = false;
+	  pb1.lock = false;
+	  pb1.trigger = false;
 	  pb1.port = GPIOB;
 	  pb1.pin = GPIO_PIN_1;
 	  pb1.scanrate = 4;
 
 		pb2.outstate = false;
+		pb2.lock = false;
+		pb2.trigger = false;
 	  pb2.port = GPIOB;
 	  pb2.pin = GPIO_PIN_2;
 	  pb2.scanrate = 4;
 		
 		pa8.outstate = false;
+		pa8.lock = false;
+		pa8.trigger = false;
 	  pa8.port = GPIOA;
 	  pa8.pin = GPIO_PIN_8;
 	  pa8.scanrate = 4;		
 		
     pa12.outstate = false;
+		pa12.lock = false;
+		pa12.trigger = false;
 	  pa12.port = GPIOA;
 	  pa12.pin = GPIO_PIN_12;
 	  pa12.scanrate = 4;		
@@ -595,16 +628,21 @@ void DoublePWM(struct double_pwm * pwm) //HIGH and LOW transistors used to PWM
 void ProcessChannel(struct _ProcessChannel * channel)
 {
 	
-	if (channel->gear_mode == 0)  //Neutral
+	if ((channel->gear_mode == 0) || (channel->squeeze == 1))  //Neutral
 	{
 		channel->pwm->duty_cycle = 0;
 		*channel->led = 0;
+		return;
 	}
 	
 	if (channel->gear_mode == 1) //Parking
 	{
+		if (params_buf[13] >= 97) params_buf[13] = 97; //Safety condition to charge BOOTSTRAP capacitor. 100% DC are not applicable
+		
 		channel->pwm->duty_cycle = params_buf[13];
-		*channel->led = 1;
+		
+		if (!channel->fault)
+		*channel->led = 1; else *channel->led = 0;
 	}
 	
 	if (channel->duty_cycle >= 97) channel->duty_cycle = 97; //Safety condition to charge BOOTSTRAP capacitor. 100% DC are not applicable
@@ -659,7 +697,8 @@ void ProcessChannel(struct _ProcessChannel * channel)
 			else 
 						channel->pwm->duty_cycle = channel->duty_cycle;
 			
-			*channel->led = 1;
+			if (!channel->fault)
+			*channel->led = 1; else *channel->led = 0;
 		}
 	}
 	
@@ -782,6 +821,8 @@ void UpdateStatus()
 							 ((bool)(main_data.DI_mode2) << STATUS_BIT1_DI_MODE2);
 	
   //Status byte 2
+	
+							  
 							 
   i2c_data.statusbyte2 = (main_data.gear) |
 						   (main_data.Left_Strength << STATUS_BIT2_CURR1_L) |
@@ -881,7 +922,7 @@ uint8_t SelectCurrentFromSpeed(uint8_t low_dc, uint8_t mid_dc, uint8_t high_dc, 
 {
 	uint8_t result = 0;
 	
-	if ((main_data.GP_Speed >= 0) && (main_data.GP_Speed < params_buf[26])){
+	if (((main_data.GP_Speed >= 0) && (main_data.GP_Speed < params_buf[26]) || main_data.Force_mode)){
   		result = high_dc;  
 		  * strength = 3;
 	}
@@ -893,8 +934,8 @@ uint8_t SelectCurrentFromSpeed(uint8_t low_dc, uint8_t mid_dc, uint8_t high_dc, 
 	else
 	if  (main_data.GP_Speed >= params_buf[27]) 
 	{
-		result = low_dc;
-		* strength = 1;
+			result = low_dc;
+			* strength = 1;
   }		
 	
 	return result;
@@ -907,7 +948,7 @@ void UpdateChannelsData()
 	Channel_L.duty_cycle = SelectCurrentFromSpeed(params_buf[1],params_buf[2],params_buf[3], &main_data.Left_Strength);
 	
 
-	Channel_L.squeeze = pb2.outstate;
+	Channel_L.squeeze = main_data.Squeeze_mode;
 	Channel_L.led = &main_data.Left_On;
 	Channel_L.T_release = params_buf[11];
 
@@ -915,7 +956,7 @@ void UpdateChannelsData()
 	Channel_R.gear_mode = main_data.selector_mode;
 	Channel_R.duty_cycle = SelectCurrentFromSpeed(params_buf[4],params_buf[5],params_buf[6], &main_data.Right_Strength);
 	
-	Channel_R.squeeze = pb2.outstate;
+	Channel_R.squeeze = main_data.Squeeze_mode;
 	Channel_R.led = &main_data.Right_On;	
 	Channel_R.T_release = params_buf[12];
 	
@@ -935,10 +976,10 @@ void UpdateChannelsData()
 void ProcessDIevents()
 {
 
-
 	if (pb0.outstate) //Button L
 	{
 		main_data.Left_button = 1;
+		
 	} else
 	{
 		main_data.Left_button = 0;
@@ -968,11 +1009,14 @@ void ProcessDIevents()
 	params_buf[20] = main_data.DI_mode1;
 	
 	
-	if (pb2.outstate) //Squeeze
+	if (pb2.outstate) //Squeeze/Force
 	{
-		main_data.Squeeze_mode = 1;
+		if (params_buf[28] == 1) main_data.Force_mode = 1;
+		else
+														 main_data.Squeeze_mode = 1;
 	} else
 	{
+		main_data.Force_mode = 0;
 		main_data.Squeeze_mode  = 0;
 	}
 	
@@ -1007,6 +1051,11 @@ void ProcessDIevents()
 		  main_data.gear = (1 << STATUS_BIT2_GEAR_D);
 		  main_data.selector_mode = 2;
 	}	
+	 
+	if (main_data.Force_mode) {
+		  main_data.gear = (1 << STATUS_BIT2_FORCE);
+	}	
+	
 }
 
 int16_t ADC_to_Celsius(int16_t adc)
@@ -1072,7 +1121,11 @@ void ScanSpeedSensor()
 	old_value = value;
 }
 
-
+void DOError()
+{
+		if (main_data.DO_error) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); else
+		                        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+}
 
 
 /* USER CODE END 0 */
@@ -1114,10 +1167,7 @@ int main(void)
 	}
 	if (!CheckParamsLimits(&params_buf[0]))
 	{
-		
-		
-		WriteDefsToFlash();
-		
+		WriteDefsToFlash();	
 	}	
 
   /* USER CODE END SysInit */
@@ -1181,8 +1231,25 @@ int main(void)
   while (1)
   {
 		HAL_IWDG_Refresh(&hiwdg);
-		AnalogAddValue(&pa[0], GetADC1_Value(ADC_CHANNEL_0)); //CS_L
-		AnalogAddValue(&pa[1], GetADC1_Value(ADC_CHANNEL_1)); //CS_R
+		
+		if (!pb0.lock) {
+			  pwm_L.enable = true;
+			  main_data.Left_fault_stage2 = false;
+			  Channel_L.fault = false;
+			  
+		}
+		if (!pb1.lock) {
+			  pwm_R.enable = true;
+			  main_data.Right_fault_stage2 = false;
+   			Channel_R.fault = false;
+		}
+		
+		if (!pb0.lock && !pb1.lock) main_data.DO_error = false;
+		
+		
+		AnalogAddValue(&pa[0], GetADC1_Value(ADC_CHANNEL_0));  //CS_L
+		AnalogAddValue(&pa[1], GetADC1_Value(ADC_CHANNEL_1));  //CS_R
+		
 		AnalogAddValue(&pa[4], GetADC1_Value(ADC_CHANNEL_4)); //TEMP0
 		
 		
@@ -1193,6 +1260,7 @@ int main(void)
 		//pa[6].in_value = GetADC1_Value(ADC_CHANNEL_6);  //ANALOG 2		
 
 		ScanSpeedSensor();
+		DOError();
 		
 		
 		if ((HAL_GetTick() - timers[0]) > 100) //0.1 sec
@@ -1201,9 +1269,7 @@ int main(void)
 			UpdateChannelsData();
 			ProcessDIevents();
 			
-			timers[0] = HAL_GetTick();		
-      temp0++;			
-
+			timers[0] = HAL_GetTick();	
 		}
 		
 
@@ -1228,27 +1294,63 @@ int main(void)
 			AnalogAverage(&pa[0]);
 			AnalogAverage(&pa[1]);
 			AnalogAverage(&pa[4]);
-
+			
 			
 
 			params_buf[9] = pa[0].out_value/params_buf[22]; //Actual Current L
 			
 			params_buf[10] = pa[1].out_value/params_buf[23]; //Actual Current R
 			
-			main_data.GP_Temp = ADC_to_Celsius(pa[4].out_value);   //Temperature of GP
-			main_data.OverTemp = (main_data.GP_Temp >= params_buf[14]);
+			if (((uint16_t) params_buf[9] >=  (uint16_t) params_buf[16]*10) && (params_buf[16] > 0)) // Overload LEFT
+			{
+			    pwm_L.enable = false;
+			    main_data.DO_error = true;
+			    main_data.Left_fault_stage2 = true;
+			    pb0.lock = true;
+				  Channel_L.fault = true;
+			  	
+		  } 	
 			
-			if ((params_buf[15] == 1) && main_data.OverTemp) //Overheat
+			if (((uint16_t) params_buf[10] >= (uint16_t) params_buf[17]*10) && (params_buf[17] > 0)) // Overload RIGHT
 			{
-				//main_data.DO_error = true;
-				pwm_R.enable = false;
-				pwm_L.enable = false;
-			} else
+			    pwm_R.enable = false;
+			    main_data.DO_error = true;
+			    main_data.Right_fault_stage2 = true;
+			    pb1.lock = true;
+				  Channel_R.fault = true;
+				  
+		  } 	
+			
+			
+			main_data.GP_Temp = ADC_to_Celsius(pa[4].out_value);   //Temperature of GP
+			
+			if (params_buf[15] == 1)
 			{
-			  pwm_R.enable = true;
-				pwm_L.enable = true;
-				//main_data.DO_error = false;
-			}
+					bool OverTemp_flag = main_data.OverTemp;
+			    main_data.OverTemp = (main_data.GP_Temp >= params_buf[14]);
+			
+			    if (OverTemp_flag && !main_data.OverTemp) {
+						  
+						  main_data.DO_error = false;
+						  pwm_R.enable = true;
+					  	pwm_L.enable = true;
+						  Channel_L.fault = false;
+						  Channel_R.fault = false;
+						
+					}
+			
+					if (main_data.OverTemp) //Overheat
+					{
+				    main_data.DO_error = true;
+						pwm_R.enable = false;
+						pwm_L.enable = false;
+						main_data.Left_On = false;
+						main_data.Right_On = false;
+						Channel_L.fault = true;
+						Channel_R.fault = true;
+					} 
+			
+				}
 			 
 			timers[3] = HAL_GetTick();
 		}
@@ -1273,10 +1375,6 @@ int main(void)
 		
 		if ((HAL_GetTick() - timers[5]) > 1000) //1.0 sec
 		{
-		  main_data.DO_error = !main_data.DO_error;
-			
-			if (main_data.DO_error) HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_SET); else
-		                          HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
 			
 			timers[5] = HAL_GetTick();
 		}

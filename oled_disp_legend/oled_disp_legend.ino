@@ -26,7 +26,7 @@
 
 #define WAIT_100HZ 0xB1  // Timer2 100Hz
 
-#define PARAMETERS 28
+#define PARAMETERS 30
 
 
 
@@ -54,7 +54,7 @@
 
 //status byte 2
 #define STATUS_BIT2_GEAR_P        0
-#define STATUS_BIT2_GEAR_R        1
+#define STATUS_BIT2_FORCE         1
 #define STATUS_BIT2_GEAR_N        2
 #define STATUS_BIT2_GEAR_D        3
 #define STATUS_BIT2_CURR1_L       4
@@ -89,6 +89,7 @@ struct MainScreenSet{
   uint16_t GP_Speed;
   bool Water_mode;
   bool Squeeze_mode;
+  bool Force_mode;
   bool Left_button;
   bool Right_button;
   bool OverTemp;
@@ -97,8 +98,10 @@ struct MainScreenSet{
   uint8_t Left_Strength;        // Empty, LOW, MID, HIGH
   uint8_t Left_Strength_level;  //Level in persantage
   uint8_t selector_mode;        // 1 - P, 2 - R, 3 - N, 4 - D
-  uint8_t Left_fault;
-  uint8_t Right_fault;
+  bool Left_fault1;
+  bool Left_fault2;
+  bool Right_fault1;
+  bool Right_fault2;
 };
 
 
@@ -115,7 +118,7 @@ struct MenuRow{
 };
 
 const MenuRow menus[] PROGMEM = {
-   {1,"01","01 I L LOW",30,0,100,1,0,2},
+  {1,"01","01 I L LOW",30,0,100,1,0,2},
   {2,"02","02 I L MID",60,0,100,1,0,2},
   {3,"03","03 I L HIGH",100,0,100,1,0,2},
   {4,"04","04 I R LOW",30,0,100,1,0,2},
@@ -130,8 +133,8 @@ const MenuRow menus[] PROGMEM = {
   {13,"13","13 I parking P",15,0,100,1,0,2},
   {14,"14","14 Temp fail",80,20,140,1,0,7},
   {15,"15","15 Off on temp",1,0,1,1,0,0},
-  {16,"16","16 Iovercur. L",45,0,80,1,0,3},
-  {17,"17","17 Iovercur. R",45,0,80,1,0,3},
+  {16,"16","16 Iovercur. L",15,0,30,1,0,3},
+  {17,"17","17 Iovercur. R",15,0,30,1,0,3},
   {18,"18","18 CAN speed",4,0,6,1,0,0},
   {19,"19","19 CAN address",0x11,0x01,0xFE,1,0,0}, 
   {20,"20","20 DI mode 1",0,0,1,0,0,0}, 
@@ -140,9 +143,11 @@ const MenuRow menus[] PROGMEM = {
 	{23,"23","23 I Calibr R",40,10,200,1,0,0}, 
   {24,"24","24 Speed cal.",29,1,250,1,0,0},  
   {25,"25","25 Firmware", 10,1,100,0,1,0},
-	{26,"26","26 Speed 1 st",5,1,100,1,0,8},
-	{27,"27","27 Speed 2 st",15,1,100,1,0,8},
-  {28,"28","28 Language",1,0,1,1,0,0},
+	{26,"26","26 Speed 1 st",  3,1,100,1,0,8},
+	{27,"27","27 Speed 2 st", 15,1,100,1,0,8},
+	{28,"28","28 DI SQ/FORCE", 1,0,1,1,0,0},
+	{29,"29","29 DI WTR/FUNC", 1,0,1,1,0,0},
+  {30,"30","30 Language",1,0,1,1,0,0},
 };
 
 MainScreenSet main_oled;
@@ -152,7 +157,7 @@ struct i2c_data_{
   uint8_t statusbyte1;
   uint8_t statusbyte2;
   uint8_t GP_Speed;
-  int8_t GP_temp;
+  int8_t  GP_temp;
   uint8_t current_page;
   uint8_t data[5];
   uint8_t paramfromdisp;
@@ -217,9 +222,15 @@ void InitMainScreenSet()
   main_oled.Right_Strength = 0;
 
   main_oled.Squeeze_mode = false;
+  main_oled.Force_mode = false;
   main_oled.Water_mode = false;
   main_oled.selector_mode = 0;
   main_oled.OverTemp = false;
+  main_oled.Left_fault1 = false;
+  main_oled.Left_fault2 = false;
+
+  main_oled.Right_fault1 = false;
+  main_oled.Right_fault2 = false;
 }
 
 void print_friction(uint8_t side, uint8_t strength_level)
@@ -311,34 +322,50 @@ void MainScreen(MainScreenSet * screen)
   oled.setCursorXY(50, 56); // left strength
   oled.setScale(1);
   
-  
-  switch(screen->Left_Strength)
+  if (!screen->Left_fault1 && !screen->Left_fault2)
   {
-     case 0:  if (lang_eeprom == 0) oled.print(F("ОТКл")); else oled.print(F("OFF"));
+    switch(screen->Left_Strength)
+    {
+      case 0:  if (lang_eeprom == 0) oled.print(F("ОТКЛ")); else oled.print(F("OFF"));
               break;
-     case 1:  if (lang_eeprom == 0) oled.print(F("НИЗ")); else oled.print(F("LOW"));
+      case 1:  if (lang_eeprom == 0) oled.print(F("НИЗ")); else oled.print(F("LOW"));
               break;
-     case 2:  if (lang_eeprom == 0) oled.print(F("СР")); else oled.print(F("MID"));
+      case 2:  if (lang_eeprom == 0) oled.print(F("СР")); else oled.print(F("MID"));
               break;
-     case 3:  if (lang_eeprom == 0) oled.print(F("ВЫС")); else oled.print(F("HIGH"));
-              break;    
+      case 3:  if (lang_eeprom == 0) oled.print(F("ВЫС")); else oled.print(F("HIGH"));
+              break;
+    }    
+  } else 
+  {
+    if (screen->Left_fault1) oled.print(F("F1")); else
+    if (screen->Left_fault2) oled.print(F("F2"));
   }
+
   print_friction(0, screen->Left_Strength);
 
 
   oled.setCursorXY(95, 56); // right strength
 
-  switch(screen->Right_Strength)
+  if (!screen->Right_fault1 && !screen->Right_fault2)
   {
-     case 0:  if (lang_eeprom == 0) oled.print(F("ОТКЛ")); else oled.print(F("OFF"));
+    switch(screen->Right_Strength)
+   {
+      case 0:  if (lang_eeprom == 0) oled.print(F("ОТКЛ")); else oled.print(F("OFF"));
               break;
-     case 1:  if (lang_eeprom == 0) oled.print(F("НИЗ")); else oled.print(F("LOW"));
+      case 1:  if (lang_eeprom == 0) oled.print(F("НИЗ")); else oled.print(F("LOW"));
               break;
-     case 2:  if (lang_eeprom == 0) oled.print(F("СР")); else oled.print(F("MID"));
+      case 2:  if (lang_eeprom == 0) oled.print(F("СР")); else oled.print(F("MID"));
               break;
-     case 3:  if (lang_eeprom == 0) oled.print(F("ВЫС")); else oled.print(F("HIGH"));
+      case 3:  if (lang_eeprom == 0) oled.print(F("ВЫС")); else oled.print(F("HIGH"));
               break;    
+   }
+  } else 
+  {
+    if (screen->Right_fault1) oled.print(F("F1")); else
+    if (screen->Right_fault2) oled.print(F("F2"));
   }
+
+
   print_friction(1, screen->Right_Strength);
 
   
@@ -409,13 +436,12 @@ void MainScreen(MainScreenSet * screen)
      case 0:  break;
      case 1:  oled.print(F("P"));
               break;
-     case 2:  oled.print(F("R"));
-              break;
      case 3:  oled.print(F("N"));
               break;    
      case 4:  oled.print(F("D"));
               break;  
   }
+  if (screen->Force_mode) oled.print(F("F"));
 
   oled.update();
 }
@@ -579,19 +605,19 @@ void Update_status()
   else
   PORTD &= ~(LED2); 
 
-  main_oled.Left_fault = 0;
-  if (i2c_data.statusbyte1 & (1 << STATUS_BIT1_L_TRIP_STAGE1)) main_oled.Left_fault+=1;
-  if (i2c_data.statusbyte1 & (1 << STATUS_BIT1_L_TRIP_STAGE2)) main_oled.Left_fault+=2;  
+  
+  main_oled.Left_fault1 = i2c_data.statusbyte1 & (1 << STATUS_BIT1_L_TRIP_STAGE1);
+  main_oled.Left_fault2 = i2c_data.statusbyte1 & (1 << STATUS_BIT1_L_TRIP_STAGE2);  
 
-  main_oled.Right_fault = 0;
-  if (i2c_data.statusbyte1 & (1 << STATUS_BIT1_R_TRIP_STAGE1)) main_oled.Left_fault+=1;
-  if (i2c_data.statusbyte1 & (1 << STATUS_BIT1_R_TRIP_STAGE2)) main_oled.Left_fault+=2;  
+  
+  main_oled.Right_fault1 = i2c_data.statusbyte1 & (1 << STATUS_BIT1_R_TRIP_STAGE1);
+  main_oled.Right_fault2 = i2c_data.statusbyte1 & (1 << STATUS_BIT1_R_TRIP_STAGE2); 
         
   main_oled.Squeeze_mode=i2c_data.statusbyte0 & (1 << STATUS_BIT0_SQUEEZE);  
 
   main_oled.selector_mode = 0;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_P)) main_oled.selector_mode = 1;
-  if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_R)) main_oled.selector_mode = 2;
+  if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_FORCE)) main_oled.Force_mode = true; else  main_oled.Force_mode = false;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_N)) main_oled.selector_mode = 3;
   if (i2c_data.statusbyte2 & (1 << STATUS_BIT2_GEAR_D)) main_oled.selector_mode = 4;
 
@@ -672,7 +698,7 @@ void onItemChange(const int index, const void* val, const byte valType) {
 boolean onItemPrintOverride(const int index, const void* val, const byte valType) {
 
   if (index > 0)
-  if (!((index >=4) && (menu_page == 6)))
+  if (!((index >=6) && (menu_page == 6)))
       return false;
       
 
@@ -805,7 +831,7 @@ void UpButton()
         {
           if (!Setup_param)
           {
-            menu.gotoIndex_(3); 
+            menu.gotoIndex_(5); 
           } else
            menu.selectNext(0);
 

@@ -154,7 +154,7 @@
           <Type>0</Type>
           <LineNumber>3709</LineNumber>
           <EnabledFlag>0</EnabledFlag>
-          <Address>134232370</Address>
+          <Address>134232454</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -175,32 +175,12 @@
         <Ww>
           <count>1</count>
           <WinNumber>1</WinNumber>
-          <ItemText>temp0,0x0A</ItemText>
+          <ItemText>main_data.Left_On</ItemText>
         </Ww>
         <Ww>
           <count>2</count>
           <WinNumber>1</WinNumber>
-          <ItemText>tick,0x0A</ItemText>
-        </Ww>
-        <Ww>
-          <count>3</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>params_buf</ItemText>
-        </Ww>
-        <Ww>
-          <count>4</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>main_data.GP_Speed</ItemText>
-        </Ww>
-        <Ww>
-          <count>5</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>params_buf[24]</ItemText>
-        </Ww>
-        <Ww>
-          <count>6</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>params_buf</ItemText>
+          <ItemText>main_data.Right_On</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>
